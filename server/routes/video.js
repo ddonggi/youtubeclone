@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Video } = require("../models/Video");
-
+const {Subscriber} = require("../models/Subscriber");
 const { auth } = require("../middleware/auth");
 const multer = require("multer");
 var ffmpeg = require("fluent-ffmpeg");
@@ -46,6 +46,16 @@ router.post('/uploadVideo', (req,res) =>{
     })
 })
 
+router.post('/getVideoDetail', (req,res) =>{
+    //비디오정보들을 DB에 저장한다
+    Video.findOne({"_id" : req.body.videoId})
+    .populate('writer')
+    .exec((err,VideoDetail)=>{
+        if(err) return res.status(400).send(err)
+        return res.status(200).json({success:true,VideoDetail})
+    })
+})
+
 router.get('/getVideos', (req,res) =>{
     //비디오정보들을 DB에서 가져와서 클라이언트에 보낸다.
     Video.find()
@@ -55,6 +65,28 @@ router.get('/getVideos', (req,res) =>{
             res.status(200).json({success:true,videos})
         })
 
+})
+
+router.get('/getSubscriptionVideos', (req,res) =>{
+    //자신의 userId를 가지고 구독하는 사람들을 찾는다.
+    Subscriber.find({userFrom:req.body.userFrom})
+    .exec((err,subscriberInfo)=>{
+        if(err) return res.status(400).send(err);
+
+        let subscribedUser = [];
+        subscriberInfo.map((subscriber,i)=>{
+            subscribedUser.push(subscriber.userTo);
+        })
+        
+        //그 사람들의 비디오를 가지고 온다.
+        Video.find({writer:{$in:subscribedUser}}) // $in mongoDB 기능
+        .populate('writer')
+        .exec((err,videos)=>{
+            if(err) return res.status(400).send(err);
+            return res.status(200).json({success:true,videos})
+        })
+
+    })
 })
 
 router.post('/thumbnail', (req,res) =>{
